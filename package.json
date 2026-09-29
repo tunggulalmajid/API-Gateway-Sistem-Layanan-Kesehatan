@@ -1,0 +1,25 @@
+{
+  "name": "api-gateway-sistem-layanan-kesehatan",
+  "version": "1.0.0",
+  "description": "API Gateway Sistem Layanan Kesehatan",
+  "main": "gateway.js",
+  "scripts": {
+    "start": "node gateway.js",
+    "start:gateway": "node gateway.js",
+    "start:prescription": "node services/prescriptionService.js",
+    "start:pharmacy": "node services/pharmacyService.js",
+    "start:cashier": "node services/cashierService.js",
+    "start:medical-record": "node services/medicalRecordService.js",
+    "start:all": "concurrently -n \"GATEWAY,RX,PHARM,CASH,EMR\" -c \"cyan,magenta,green,yellow,blue\" \"node gateway.js\" \"node services/prescriptionService.js\" \"node services/pharmacyService.js\" \"node services/cashierService.js\" \"node services/medicalRecordService.js\"",
+    "simulate": "node simulate.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^10.0.5",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^4.2.0"
+  }
+}
