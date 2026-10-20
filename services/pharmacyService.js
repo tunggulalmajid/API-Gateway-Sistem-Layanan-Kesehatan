@@ -1,4 +1,6 @@
 const express = require('express');
+const { registerService } = require('./discoveryClient');
+
 const app = express();
 const PORT = 8082;
 
@@ -24,4 +26,5 @@ app.post('/dispense', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Pharmacy Service berjalan di port ${PORT}`);
+    registerService({ serviceName: 'pharmacy-service', host: 'localhost', port: PORT });
 });

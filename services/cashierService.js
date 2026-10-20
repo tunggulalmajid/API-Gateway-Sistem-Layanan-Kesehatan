@@ -1,4 +1,6 @@
 const express = require('express');
+const { registerService } = require('./discoveryClient');
+
 const app = express();
 const PORT = 8083;
 
@@ -25,4 +27,5 @@ app.post('/create-bill', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Cashier Service berjalan di port ${PORT}`);
+    registerService({ serviceName: 'cashier-service', host: 'localhost', port: PORT });
 });

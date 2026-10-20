@@ -1,16 +1,17 @@
 {
   "name": "api-gateway-sistem-layanan-kesehatan",
   "version": "1.0.0",
-  "description": "API Gateway Sistem Layanan Kesehatan",
+  "description": "API Gateway Sistem Layanan Kesehatan dengan Service Discovery",
   "main": "gateway.js",
   "scripts": {
     "start": "node gateway.js",
+    "start:registry": "node registryService.js",
     "start:gateway": "node gateway.js",
     "start:prescription": "node services/prescriptionService.js",
     "start:pharmacy": "node services/pharmacyService.js",
     "start:cashier": "node services/cashierService.js",
     "start:medical-record": "node services/medicalRecordService.js",
-    "start:all": "concurrently -n \"GATEWAY,RX,PHARM,CASH,EMR\" -c \"cyan,magenta,green,yellow,blue\" \"node gateway.js\" \"node services/prescriptionService.js\" \"node services/pharmacyService.js\" \"node services/cashierService.js\" \"node services/medicalRecordService.js\"",
+    "start:all": "concurrently -n \"REGISTRY,GATEWAY,RX,PHARM,CASH,EMR\" -c \"white,cyan,magenta,green,yellow,blue\" \"node registryService.js\" \"node gateway.js\" \"node services/prescriptionService.js\" \"node services/pharmacyService.js\" \"node services/cashierService.js\" \"node services/medicalRecordService.js\"",
     "simulate": "node simulate.js"
   },
   "keywords": [],
