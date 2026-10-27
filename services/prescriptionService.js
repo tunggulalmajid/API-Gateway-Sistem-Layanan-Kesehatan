@@ -1,10 +1,12 @@
 const express = require('express');
-const { registerService } = require('./discoveryClient');
+const { registerService, callService } = require('./discoveryClient');
 
 const app = express();
 const PORT = 8081;
 
 app.use(express.json());
+
+const prescriptions = [];
 
 app.get('/status', (req, res) => {
     res.json({
@@ -14,18 +16,77 @@ app.get('/status', (req, res) => {
     });
 });
 
-app.post('/submit-resep', (req, res) => {
-    console.log('[Prescription Service] Resep diterima:', req.body);
+app.get('/daftar-resep', (req, res) => {
+    res.json({
+        service: 'Prescription Service',
+        total: prescriptions.length,
+        data: prescriptions
+    });
+});
+
+app.post('/submit-resep', async (req, res) => {
+    const { idPasien, namaPasien, dokter, diagnosis, daftarObat, catatan } = req.body;
+
+    const idResep = `RX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const resepData = {
+        idResep,
+        idPasien: idPasien || 'RM-101',
+        namaPasien: namaPasien || 'Pasien Dummy',
+        dokter: dokter || 'dr. Umum',
+        diagnosis: diagnosis || 'Pemeriksaan Klinis',
+        daftarObat: daftarObat || ['Paracetamol 500mg', 'Amoxicillin 500mg'],
+        catatan: catatan || 'Diminum sesuai aturan',
+        diterbitkanPada: new Date().toISOString()
+    };
+
+    prescriptions.push(resepData);
+    console.log(`[Prescription Service] Resep ${idResep} diterbitkan untuk ${resepData.namaPasien}`);
+    console.log(`[Prescription Service] Memulai distribusi ke Apotek, Kasir, dan Rekam Medis via Service Discovery...`);
+
+    const [resApotek, resKasir, resRekamMedis] = await Promise.all([
+        callService('pharmacy-service', '/dispense', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resepId: idResep,
+                namaPasien: resepData.namaPasien,
+                daftarObat: resepData.daftarObat
+            })
+        }),
+        callService('cashier-service', '/create-bill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resepId: idResep,
+                idPasien: resepData.idPasien,
+                namaPasien: resepData.namaPasien,
+                daftarObat: resepData.daftarObat
+            })
+        }),
+        callService('medical-record-service', '/records', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resepId: idResep,
+                idPasien: resepData.idPasien,
+                namaPasien: resepData.namaPasien,
+                dokter: resepData.dokter,
+                diagnosis: resepData.diagnosis,
+                daftarObat: resepData.daftarObat,
+                catatan: resepData.catatan
+            })
+        })
+    ]);
+
     res.json({
         status: 'SUCCESS',
         service: 'Prescription Service',
-        pesan: 'Resep berhasil diterima oleh Prescription Service',
-        data: {
-            idResep: 'RX-1001',
-            namaPasien: req.body.namaPasien || 'Pasien Dummy',
-            dokter: req.body.dokter || 'dr. Dummy',
-            diagnosis: req.body.diagnosis || 'Pemeriksaan Umum',
-            daftarObat: req.body.daftarObat || ['Paracetamol 500mg', 'Amoxicillin 500mg']
+        pesan: 'Resep berhasil diterbitkan dan otomatis didistribusikan ke Apotek, Kasir, dan Rekam Medis melalui Service Discovery',
+        resep: resepData,
+        distribusiLayanan: {
+            apotek: resApotek,
+            kasir: resKasir,
+            rekamMedis: resRekamMedis
         }
     });
 });

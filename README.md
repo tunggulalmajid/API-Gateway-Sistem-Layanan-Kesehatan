@@ -1,21 +1,25 @@
 # API Gateway & Service Discovery - Sistem Layanan Kesehatan
 **Mata Kuliah:** Sistem Terdistribusi  
-**Pola Desain:** API Gateway Pattern, Service Registry & Discovery (Eureka-like), Dynamic Reverse Proxy, Heartbeat & TTL Eviction
+**Pola Desain:** API Gateway Pattern, Service Registry & Discovery (Eureka-like), Inter-Service Communication (Service-to-Service), Heartbeat & TTL Eviction
 
 ---
 
-## 1. Arsitektur Service Discovery & Pemetaan Port
+## 1. Arsitektur Komunikasi Sistem
 
-Sistem tidak lagi menggunakan IP dan port hardcoded pada API Gateway. Setiap microservice mendaftarkan diri secara dinamis ke **Service Registry (Port 8761)** saat booting dan mengirimkan heartbeat setiap 5 detik.
+Sistem menerapkan **dua tingkatan Service Discovery**:
+1. **North-South Traffic (Client ke Gateway ke Service):**  
+   Klien hanya mengakses API Gateway (Port 8000). Gateway mencari alamat service tujuan secara dinamis ke Service Registry (Port 8761).
+2. **East-West Traffic (Service-to-Service):**  
+   Setiap microservice bertindak sebagai *Service Provider* (didaftarkan) sekaligus *Service Consumer* (mencari service lain). Saat dokter menerbitkan resep, **Prescription Service** secara otomatis mencari dan menghubungi **Apotek**, **Kasir**, dan **Rekam Medis** melalui Service Registry tanpa hardcoded IP/port.
 
-| Komponen / Service | Port | Tipe | Rute Akses via Gateway (Port 8000) |
-| :--- | :---: | :---: | :--- |
-| **Service Registry (Eureka-like)** | **`8761`** | Registry Server | `http://localhost:8761/services` |
-| **API Gateway** | **`8000`** | Dynamic Gateway | `http://localhost:8000/` |
-| **Prescription Service** | **`8081`** | Microservice | `/api/prescription/*` |
-| **Pharmacy Service** | **`8082`** | Microservice | `/api/pharmacy/*` |
-| **Cashier Service** | **`8083`** | Microservice | `/api/cashier/*` |
-| **Medical Record Service** | **`8084`** | Microservice | `/api/medical-record/*` |
+| Komponen / Service | Port | Peran |
+| :--- | :---: | :--- |
+| **Service Registry (Eureka-like)** | **`8761`** | Pusat pendaftaran & health check instance aktif |
+| **API Gateway** | **`8000`** | Single Point of Entry & Dynamic Reverse Proxy |
+| **Prescription Service** | **`8081`** | Menerima resep & mengorkestrasi ke service lain via Discovery |
+| **Pharmacy Service** | **`8082`** | Menerima resep dari Prescription Service untuk penyiapan obat |
+| **Cashier Service** | **`8083`** | Menerima rincian biaya dari Prescription Service untuk penagihan |
+| **Medical Record Service** | **`8084`** | Menerima diagnosis & resep untuk arsip rekam medis (EMR) |
 
 ---
 
@@ -26,9 +30,9 @@ API-Gateway-Sistem-Layanan-Kesehatan/
 ├── package.json                 # Skrip npm dan dependensi
 ├── registryService.js           # Service Registry Server (Port 8761)
 ├── gateway.js                   # Dynamic API Gateway (Port 8000)
-├── simulate.js                  # Skrip simulasi pengujian alur
+├── simulate.js                  # Skrip simulasi pengujian alur inter-service
 └── services/
-    ├── discoveryClient.js       # Reusable Client SDK (Register & Heartbeat)
+    ├── discoveryClient.js       # SDK Provider (Register & Heartbeat) & Consumer (Call Service)
     ├── prescriptionService.js   # Microservice Resep (Port 8081)
     ├── pharmacyService.js       # Microservice Apotek (Port 8082)
     ├── cashierService.js        # Microservice Kasir (Port 8083)
@@ -74,8 +78,13 @@ Buka terminal baru, jalankan:
 npm run simulate
 ```
 
-Alur yang diuji oleh skrip:
-1. Pengecekan daftar service terdaftar di Service Registry (`GET http://localhost:8761/services`).
-2. Pengecekan status Gateway dan live discovery (`GET http://localhost:8000/`).
-3. Pengujian proxy dinamis ke setiap microservice melalui nama service.
-4. Simulasi dokter submit resep dan penerusan data ke Apotek, Kasir, dan Rekam Medis.
+Alur yang disimulasikan:
+1. Pengecekan status Service Registry di `http://localhost:8761/services`.
+2. Pengecekan Gateway di `http://localhost:8000/`.
+3. Pengecekan kesehatan setiap service melalui Gateway.
+4. Dokter mengirimkan resep ke Gateway (`POST /api/prescription/submit-resep`).
+5. **Prescription Service** secara otomatis mencari alamat dan menghubungi:
+   - Apotek via `POST /dispense`
+   - Kasir via `POST /create-bill`
+   - Rekam Medis via `POST /records`
+6. Verifikasi bahwa data antrean apotek, faktur kasir, dan arsip rekam medis benar-benar tersimpan di masing-masing service.

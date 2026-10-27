@@ -1,10 +1,12 @@
 const express = require('express');
-const { registerService } = require('./discoveryClient');
+const { registerService, callService } = require('./discoveryClient');
 
 const app = express();
 const PORT = 8082;
 
 app.use(express.json());
+
+const queue = [];
 
 app.get('/status', (req, res) => {
     res.json({
@@ -14,13 +16,34 @@ app.get('/status', (req, res) => {
     });
 });
 
+app.get('/antrean', (req, res) => {
+    res.json({
+        service: 'Pharmacy Service',
+        totalAntrean: queue.length,
+        antrean: queue
+    });
+});
+
 app.post('/dispense', (req, res) => {
-    console.log('[Pharmacy Service] Permintaan penyiapan obat diterima:', req.body);
+    const { resepId, namaPasien, daftarObat } = req.body;
+    console.log(`[Pharmacy Service] Menerima permintaan obat dari Prescription Service: ${resepId} untuk ${namaPasien}`);
+
+    const itemAntrean = {
+        nomorAntrean: `APT-${queue.length + 101}`,
+        resepId: resepId || 'RX-UNKNOWN',
+        namaPasien: namaPasien || 'Pasien',
+        daftarObat: daftarObat || [],
+        status: 'SEDANG_DIRACIK',
+        waktuMasuk: new Date().toISOString()
+    };
+
+    queue.push(itemAntrean);
+
     res.json({
         status: 'SUCCESS',
         service: 'Pharmacy Service',
-        pesan: 'Obat sedang disiapkan oleh Apotek',
-        antrean: 'APT-101'
+        pesan: 'Permintaan obat diterima dari Prescription Service dan sedang disiapkan',
+        data: itemAntrean
     });
 });
 

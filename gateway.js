@@ -46,8 +46,8 @@ async function getServiceUrl(serviceName) {
     const currentIdx = rrIndex.get(serviceName) || 0;
     const instance = instances[currentIdx % instances.length];
     rrIndex.set(serviceName, currentIdx + 1);
-
     return instance.url;
+    
 }
 
 function createDynamicProxy(serviceName, pathPrefix) {

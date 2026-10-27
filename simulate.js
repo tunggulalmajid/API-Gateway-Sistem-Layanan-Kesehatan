@@ -2,9 +2,9 @@ const GATEWAY = 'http://localhost:8000';
 const REGISTRY = 'http://localhost:8761';
 
 async function main() {
-    console.log('====================================================');
-    console.log('SIMULASI SERVICE DISCOVERY & API GATEWAY ROUTING');
-    console.log('====================================================\n');
+    console.log('==================================================================');
+    console.log('SIMULASI INTEGRASI SERVICE DISCOVERY & KOMUNIKASI ANTAR-LAYANAN');
+    console.log('==================================================================\n');
 
     console.log('1. CEK SERVICE REGISTRY (PORT 8761):');
     try {
@@ -19,7 +19,7 @@ async function main() {
     const gwRes = await fetch(`${GATEWAY}/`).then(r => r.json());
     console.log('GET http://localhost:8000/ ->\n', JSON.stringify(gwRes, null, 2));
 
-    console.log('\n3. UJI ROUTING DINAMIS KE SETIAP SERVICE VIA GATEWAY:');
+    console.log('\n3. CEK KESEHATAN SETIAP SERVICE VIA GATEWAY:');
     const rxStatus = await fetch(`${GATEWAY}/api/prescription/status`).then(r => r.json());
     console.log('GET /api/prescription/status   ->', rxStatus);
 
@@ -32,60 +32,41 @@ async function main() {
     const mrStatus = await fetch(`${GATEWAY}/api/medical-record/status`).then(r => r.json());
     console.log('GET /api/medical-record/status ->', mrStatus);
 
-    console.log('\n4. DOKTER SUBMIT RESEP (DYNAMIC PROXY KE PRESCRIPTION SERVICE):');
+    console.log('\n4. DOKTER SUBMIT RESEP (MEMICU SERVICE-TO-SERVICE VIA DISCOVERY):');
     const dummyResep = {
+        idPasien: 'RM-2026-88',
         namaPasien: 'Budi Santoso',
-        dokter: 'dr. Andi',
-        diagnosis: 'Demam & Radang Tenggorokan',
-        daftarObat: ['Paracetamol 500mg', 'Amoxicillin 500mg']
+        dokter: 'dr. Andi Pratama, Sp.A',
+        diagnosis: 'Infeksi Saluran Pernapasan & Faringitis',
+        daftarObat: [
+            'Amoxicillin 500mg - 3x1 setelah makan',
+            'Paracetamol 500mg - 3x1 jika demam'
+        ],
+        catatan: 'Habiskan antibiotik dan banyak istirahat'
     };
 
+    console.log('Mengirim POST /api/prescription/submit-resep via Gateway...');
     const resepRes = await fetch(`${GATEWAY}/api/prescription/submit-resep`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dummyResep)
     }).then(r => r.json());
-    console.log('POST /api/prescription/submit-resep ->', resepRes);
+    console.log('Hasil Respons Orkestrasi Prescription Service ->\n', JSON.stringify(resepRes, null, 2));
 
-    console.log('\n5. DATA DITERUSKAN KE APOTEK (DYNAMIC PROXY KE PHARMACY SERVICE):');
-    const pharmRes = await fetch(`${GATEWAY}/api/pharmacy/dispense`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            resepId: resepRes.data.idResep,
-            namaPasien: dummyResep.namaPasien,
-            daftarObat: dummyResep.daftarObat
-        })
-    }).then(r => r.json());
-    console.log('POST /api/pharmacy/dispense ->', pharmRes);
+    console.log('\n5. VERIFIKASI HASIL PENERUSAN PADA SETIAP SERVICE:');
 
-    console.log('\n6. DATA DITERUSKAN KE KASIR (DYNAMIC PROXY KE CASHIER SERVICE):');
-    const cashierRes = await fetch(`${GATEWAY}/api/cashier/create-bill`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            resepId: resepRes.data.idResep,
-            namaPasien: dummyResep.namaPasien
-        })
-    }).then(r => r.json());
-    console.log('POST /api/cashier/create-bill ->', cashierRes);
+    const queueRes = await fetch(`${GATEWAY}/api/pharmacy/antrean`).then(r => r.json());
+    console.log('GET /api/pharmacy/antrean       -> Antrean Apotek:', queueRes.totalAntrean, 'item');
 
-    console.log('\n7. DATA DITERUSKAN KE REKAM MEDIS (DYNAMIC PROXY KE MEDICAL RECORD SERVICE):');
-    const mrRes = await fetch(`${GATEWAY}/api/medical-record/records`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            resepId: resepRes.data.idResep,
-            namaPasien: dummyResep.namaPasien,
-            dokter: dummyResep.dokter,
-            diagnosis: dummyResep.diagnosis
-        })
-    }).then(r => r.json());
-    console.log('POST /api/medical-record/records ->', mrRes);
+    const invRes = await fetch(`${GATEWAY}/api/cashier/invoices`).then(r => r.json());
+    console.log('GET /api/cashier/invoices       -> Invoice Kasir :', invRes.totalInvoice, 'item');
 
-    console.log('\n====================================================');
-    console.log('SIMULASI BERHASIL: SERVICE DISCOVERY & ROUTING SEMPURNA');
-    console.log('====================================================');
+    const recRes = await fetch(`${GATEWAY}/api/medical-record/records`).then(r => r.json());
+    console.log('GET /api/medical-record/records -> Rekam Medis   :', recRes.totalRecords, 'arsip');
+
+    console.log('\n==================================================================');
+    console.log('SIMULASI BERHASIL: SERVICE-TO-SERVICE DISCOVERY BERJALAN SEMPURNA');
+    console.log('==================================================================');
 }
 
 main().catch(console.error);
