@@ -81,16 +81,6 @@ async function main() {
         const pct = Math.round((count / 6) * 100);
         console.log(`      • Port ${port} : ${count} request (${pct}%)`);
     }
-
-    console.log('\n========================================================================================');
-    console.log('HASIL: LOAD BALANCER ROUND-ROBIN TERBUKTI MEMBAGI BEBAN DENGAN SEMPURNA');
-    console.log('----------------------------------------------------------------------------------------');
-    console.log('CARA DEMO AUTO-FAILOVER KE DOSEN:');
-    console.log('1. Matikan salah satu instance (misal Port 8085) dengan Ctrl+C di terminalnya.');
-    console.log('2. Jalankan kembali: node demo-loadbalancer.js');
-    console.log('3. Perhatikan: Seluruh request tetap sukses (100% ditangani Port 8081 tanpa error).');
-    console.log('4. Nyalakan kembali Port 8085, dan beban otomatis terbagi rata kembali (Self-Healing).');
-    console.log('========================================================================================\n');
 }
 
 main().catch(console.error);
