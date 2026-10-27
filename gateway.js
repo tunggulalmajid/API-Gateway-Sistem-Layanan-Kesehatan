@@ -29,7 +29,7 @@ async function refreshCache() {
     }
 }
 
-setInterval(refreshCache, 3000);
+setInterval(refreshCache, 2000);
 refreshCache();
 
 async function getServiceUrl(serviceName) {
@@ -46,8 +46,9 @@ async function getServiceUrl(serviceName) {
     const currentIdx = rrIndex.get(serviceName) || 0;
     const instance = instances[currentIdx % instances.length];
     rrIndex.set(serviceName, currentIdx + 1);
+
+    console.log(`[GATEWAY LOAD BALANCER] Merutekan ${serviceName} -> ${instance.instanceId} (${instance.url})`);
     return instance.url;
-    
 }
 
 function createDynamicProxy(serviceName, pathPrefix) {
@@ -57,19 +58,21 @@ function createDynamicProxy(serviceName, pathPrefix) {
         router: async () => {
             const target = await getServiceUrl(serviceName);
             if (!target) {
-                throw new Error(`Instance untuk ${serviceName} tidak ditemukan di Service Registry`);
+                throw new Error(`Semua instance ${serviceName} sedang offline di Service Registry`);
             }
             return target;
         },
         on: {
             proxyReq: fixRequestBody,
             error: (err, req, res) => {
-                console.error(`[GATEWAY ERROR] ${serviceName}: ${err.message}`);
+                console.error(`[GATEWAY LB ERROR] Gagal menghubungi instance ${serviceName}: ${err.message}`);
+                cache.delete(serviceName);
                 if (!res.headersSent) {
                     res.status(503).json({
                         status: 'ERROR',
                         gateway: 'API Gateway Sistem Layanan Kesehatan',
-                        pesan: `Layanan ${serviceName} tidak dapat diakses atau belum terdaftar di Service Registry.`,
+                        loadBalancer: 'Native Round-Robin Load Balancer',
+                        pesan: `Seluruh instance ${serviceName} sedang tidak tersedia atau gagal merespons.`,
                         detail: err.message
                     });
                 }
@@ -94,13 +97,27 @@ app.get('/', async (req, res) => {
         registryData = { error: 'Service Registry Offline' };
     }
 
+    const clusterSummary = {};
+    for (const [sName, sInstances] of Object.entries(registryData.services || {})) {
+        clusterSummary[sName] = {
+            totalInstances: sInstances.length,
+            instances: sInstances.map(i => ({ instanceId: i.instanceId, port: i.port, status: i.status }))
+        };
+    }
+
     res.json({
         gateway: 'API Gateway Sistem Layanan Kesehatan',
         status: 'UP',
         port: PORT,
-        mode: 'Dynamic Service Discovery (Eureka-like)',
-        registryUrl: REGISTRY_URL,
-        discoveredServices: registryData.services || registryData
+        loadBalancer: {
+            algorithm: 'Round-Robin (Native / Zero-Library)',
+            status: 'ACTIVE'
+        },
+        serviceDiscovery: {
+            type: 'Eureka-like Service Registry',
+            registryUrl: REGISTRY_URL
+        },
+        clusters: clusterSummary
     });
 });
 
@@ -110,5 +127,5 @@ app.use('/api/cashier', createDynamicProxy('cashier-service', '/api/cashier'));
 app.use('/api/medical-record', createDynamicProxy('medical-record-service', '/api/medical-record'));
 
 app.listen(PORT, () => {
-    console.log(`API Gateway berjalan di port ${PORT} (Dynamic Service Discovery via ${REGISTRY_URL})`);
+    console.log(`API Gateway berjalan di port ${PORT} (Native Round-Robin Load Balancer Aktif)`);
 });

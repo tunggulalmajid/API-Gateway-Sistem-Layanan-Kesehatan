@@ -2,23 +2,27 @@ const express = require('express');
 const { registerService, callService } = require('./discoveryClient');
 
 const app = express();
-const PORT = 8082;
+const PORT = process.env.PORT || process.argv[2] || 8082;
 
 app.use(express.json());
 
 const queue = [];
+let currentInstanceId = `pharmacy-service-${PORT}`;
 
 app.get('/status', (req, res) => {
     res.json({
         service: 'Pharmacy Service',
         status: 'UP',
-        port: PORT
+        port: Number(PORT),
+        handledBy: currentInstanceId
     });
 });
 
 app.get('/antrean', (req, res) => {
     res.json({
         service: 'Pharmacy Service',
+        handledBy: currentInstanceId,
+        port: Number(PORT),
         totalAntrean: queue.length,
         antrean: queue
     });
@@ -26,7 +30,7 @@ app.get('/antrean', (req, res) => {
 
 app.post('/dispense', (req, res) => {
     const { resepId, namaPasien, daftarObat } = req.body;
-    console.log(`[Pharmacy Service] Menerima permintaan obat dari Prescription Service: ${resepId} untuk ${namaPasien}`);
+    console.log(`[Pharmacy Service] Menerima resep di ${currentInstanceId} (Port ${PORT}): ${resepId} untuk ${namaPasien}`);
 
     const itemAntrean = {
         nomorAntrean: `APT-${queue.length + 101}`,
@@ -42,12 +46,15 @@ app.post('/dispense', (req, res) => {
     res.json({
         status: 'SUCCESS',
         service: 'Pharmacy Service',
-        pesan: 'Permintaan obat diterima dari Prescription Service dan sedang disiapkan',
+        handledBy: currentInstanceId,
+        instancePort: Number(PORT),
+        pesan: 'Permintaan obat diterima dan sedang disiapkan',
         data: itemAntrean
     });
 });
 
 app.listen(PORT, () => {
     console.log(`Pharmacy Service berjalan di port ${PORT}`);
-    registerService({ serviceName: 'pharmacy-service', host: 'localhost', port: PORT });
+    const reg = registerService({ serviceName: 'pharmacy-service', host: 'localhost', port: PORT });
+    currentInstanceId = reg.instanceId;
 });

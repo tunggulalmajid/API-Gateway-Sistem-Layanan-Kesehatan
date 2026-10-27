@@ -2,23 +2,27 @@ const express = require('express');
 const { registerService, callService } = require('./discoveryClient');
 
 const app = express();
-const PORT = 8081;
+const PORT = process.env.PORT || process.argv[2] || 8081;
 
 app.use(express.json());
 
 const prescriptions = [];
+let currentInstanceId = `prescription-service-${PORT}`;
 
 app.get('/status', (req, res) => {
     res.json({
         service: 'Prescription Service',
         status: 'UP',
-        port: PORT
+        port: Number(PORT),
+        handledBy: currentInstanceId
     });
 });
 
 app.get('/daftar-resep', (req, res) => {
     res.json({
         service: 'Prescription Service',
+        handledBy: currentInstanceId,
+        port: Number(PORT),
         total: prescriptions.length,
         data: prescriptions
     });
@@ -40,8 +44,7 @@ app.post('/submit-resep', async (req, res) => {
     };
 
     prescriptions.push(resepData);
-    console.log(`[Prescription Service] Resep ${idResep} diterbitkan untuk ${resepData.namaPasien}`);
-    console.log(`[Prescription Service] Memulai distribusi ke Apotek, Kasir, dan Rekam Medis via Service Discovery...`);
+    console.log(`[Prescription Service] Resep ${idResep} diterbitkan oleh ${currentInstanceId} (Port ${PORT})`);
 
     const [resApotek, resKasir, resRekamMedis] = await Promise.all([
         callService('pharmacy-service', '/dispense', {
@@ -81,7 +84,9 @@ app.post('/submit-resep', async (req, res) => {
     res.json({
         status: 'SUCCESS',
         service: 'Prescription Service',
-        pesan: 'Resep berhasil diterbitkan dan otomatis didistribusikan ke Apotek, Kasir, dan Rekam Medis melalui Service Discovery',
+        handledBy: currentInstanceId,
+        instancePort: Number(PORT),
+        pesan: 'Resep berhasil diterbitkan dan otomatis didistribusikan ke Apotek, Kasir, dan Rekam Medis',
         resep: resepData,
         distribusiLayanan: {
             apotek: resApotek,
@@ -93,5 +98,6 @@ app.post('/submit-resep', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Prescription Service berjalan di port ${PORT}`);
-    registerService({ serviceName: 'prescription-service', host: 'localhost', port: PORT });
+    const reg = registerService({ serviceName: 'prescription-service', host: 'localhost', port: PORT });
+    currentInstanceId = reg.instanceId;
 });

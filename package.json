@@ -1,7 +1,7 @@
 {
   "name": "api-gateway-sistem-layanan-kesehatan",
   "version": "1.0.0",
-  "description": "API Gateway Sistem Layanan Kesehatan dengan Service Discovery",
+  "description": "API Gateway Sistem Layanan Kesehatan dengan Service Discovery dan Load Balancer",
   "main": "gateway.js",
   "scripts": {
     "start": "node gateway.js",
@@ -12,7 +12,9 @@
     "start:cashier": "node services/cashierService.js",
     "start:medical-record": "node services/medicalRecordService.js",
     "start:all": "concurrently -n \"REGISTRY,GATEWAY,RX,PHARM,CASH,EMR\" -c \"white,cyan,magenta,green,yellow,blue\" \"node registryService.js\" \"node gateway.js\" \"node services/prescriptionService.js\" \"node services/pharmacyService.js\" \"node services/cashierService.js\" \"node services/medicalRecordService.js\"",
-    "simulate": "node simulate.js"
+    "start:cluster": "concurrently -n \"REGISTRY,GATEWAY,RX-1,RX-2,PHARM-1,PHARM-2,CASH,EMR\" -c \"white,cyan,magenta,magenta,green,green,yellow,blue\" \"node registryService.js\" \"node gateway.js\" \"node services/prescriptionService.js 8081\" \"node services/prescriptionService.js 8085\" \"node services/pharmacyService.js 8082\" \"node services/pharmacyService.js 8086\" \"node services/cashierService.js 8083\" \"node services/medicalRecordService.js 8084\"",
+    "simulate": "node simulate.js",
+    "demo:lb": "node demo-loadbalancer.js"
   },
   "keywords": [],
   "author": "",

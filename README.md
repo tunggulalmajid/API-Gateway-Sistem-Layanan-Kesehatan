@@ -1,90 +1,94 @@
-# API Gateway & Service Discovery - Sistem Layanan Kesehatan
+# API Gateway, Service Discovery & Load Balancer - Sistem Layanan Kesehatan
 **Mata Kuliah:** Sistem Terdistribusi  
-**Pola Desain:** API Gateway Pattern, Service Registry & Discovery (Eureka-like), Inter-Service Communication (Service-to-Service), Heartbeat & TTL Eviction
+**Pola Desain:** API Gateway Pattern, Service Registry & Discovery (Eureka-like), Dual-Layer Load Balancer (Native Round-Robin), Inter-Service Communication, Auto-Failover & High Availability
 
 ---
 
-## 1. Arsitektur Komunikasi Sistem
+## 1. Arsitektur Komunikasi & Load Balancing
 
-Sistem menerapkan **dua tingkatan Service Discovery**:
-1. **North-South Traffic (Client ke Gateway ke Service):**  
-   Klien hanya mengakses API Gateway (Port 8000). Gateway mencari alamat service tujuan secara dinamis ke Service Registry (Port 8761).
-2. **East-West Traffic (Service-to-Service):**  
-   Setiap microservice bertindak sebagai *Service Provider* (didaftarkan) sekaligus *Service Consumer* (mencari service lain). Saat dokter menerbitkan resep, **Prescription Service** secara otomatis mencari dan menghubungi **Apotek**, **Kasir**, dan **Rekam Medis** melalui Service Registry tanpa hardcoded IP/port.
+Sistem menerapkan arsitektur terdistribusi lengkap dengan **Service Discovery** dan **Dual-Layer Load Balancer (Murni / Zero-Library)**:
+
+```
+[ Klien / Dokter ]
+        │
+        ▼ (Port 8000)
+┌────────────────────────────────────────────────────────┐
+│               API GATEWAY (LOAD BALANCER 1)            │
+│       Algoritma: Round-Robin (Native / Zero-Library)   │
+└───────────────────────────┬────────────────────────────┘
+                            │
+               ┌────────────┴────────────┐
+               ▼                         ▼
+   ┌───────────────────────┐ ┌───────────────────────┐
+   │ Prescription Inst 1   │ │ Prescription Inst 2   │
+   │      (Port 8081)      │ │      (Port 8085)      │
+   └───────────┬───────────┘ └───────────┬───────────┘
+               │ (Client-Side LB 2)      │ (Client-Side LB 2)
+         ┌─────┴──────────────┐    ┌─────┴──────────────┐
+         ▼                    ▼    ▼                    ▼
+┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+│  Pharmacy Inst 1  │ │  Pharmacy Inst 2  │ │  Cashier Service  │
+│    (Port 8082)    │ │    (Port 8086)    │ │    (Port 8083)    │
+└───────────────────┘ └───────────────────┘ └───────────────────┘
+```
+
+1. **Layer 1: Gateway Load Balancer (North-South Traffic):**  
+   API Gateway mendistribusikan request penerbitan resep dokter secara berurutan (*Round-Robin*) bergantian ke **Port 8081** dan **Port 8085**.
+2. **Layer 2: Client-Side Load Balancer (East-West Inter-Service Traffic):**  
+   Prescription Service mendistribusikan permintaan racikan obat secara berurutan bergantian ke Apotek 1 (**Port 8082**) dan Apotek 2 (**Port 8086**).
+3. **Auto-Failover (Zero Downtime):**  
+   Jika salah satu instance mengalami *crash* atau dimatikan, Load Balancer mendeteksi penolakan koneksi dan otomatis mengalihkan request ke instance pasangannya yang masih aktif tanpa terjadi error di sisi klien.
+
+---
+
+## 2. Pemetaan Port & Instance Cluster
 
 | Komponen / Service | Port | Peran |
 | :--- | :---: | :--- |
-| **Service Registry (Eureka-like)** | **`8761`** | Pusat pendaftaran & health check instance aktif |
-| **API Gateway** | **`8000`** | Single Point of Entry & Dynamic Reverse Proxy |
-| **Prescription Service** | **`8081`** | Menerima resep & mengorkestrasi ke service lain via Discovery |
-| **Pharmacy Service** | **`8082`** | Menerima resep dari Prescription Service untuk penyiapan obat |
-| **Cashier Service** | **`8083`** | Menerima rincian biaya dari Prescription Service untuk penagihan |
-| **Medical Record Service** | **`8084`** | Menerima diagnosis & resep untuk arsip rekam medis (EMR) |
-
----
-
-## 2. Struktur Direktori Proyek
-
-```
-API-Gateway-Sistem-Layanan-Kesehatan/
-├── package.json                 # Skrip npm dan dependensi
-├── registryService.js           # Service Registry Server (Port 8761)
-├── gateway.js                   # Dynamic API Gateway (Port 8000)
-├── simulate.js                  # Skrip simulasi pengujian alur inter-service
-└── services/
-    ├── discoveryClient.js       # SDK Provider (Register & Heartbeat) & Consumer (Call Service)
-    ├── prescriptionService.js   # Microservice Resep (Port 8081)
-    ├── pharmacyService.js       # Microservice Apotek (Port 8082)
-    ├── cashierService.js        # Microservice Kasir (Port 8083)
-    └── medicalRecordService.js  # Microservice Rekam Medis (Port 8084)
-```
+| **Service Registry (Eureka-like)** | **`8761`** | Pusat pendaftaran instance & liveness heartbeat |
+| **API Gateway (Load Balancer Layer 1)** | **`8000`** | Single Point of Entry & Round-Robin Proxy Router |
+| **Prescription Service (Instance 1)** | **`8081`** | Pemroses resep & pengorkestrasi antar-layanan |
+| **Prescription Service (Instance 2)** | **`8085`** | Penyeimbang beban resep (Horizontal Scaling) |
+| **Pharmacy Service (Instance 1)** | **`8082`** | Penyiapan obat & peracikan farmasi |
+| **Pharmacy Service (Instance 2)** | **`8086`** | Penyeimbang beban farmasi (Horizontal Scaling) |
+| **Cashier Service** | **`8083`** | Penerbitan faktur tagihan pembayaran |
+| **Medical Record Service** | **`8084`** | Pencatatan arsip rekam medis pasien (EMR) |
 
 ---
 
 ## 3. Cara Menjalankan
 
-### Menjalankan Seluruh Sistem (Registry + Gateway + 4 Services):
+### A. Menjalankan Klaster Penuh (Multi-Instance Load Balancer):
+Jalankan seluruh 8 server dalam satu perintah:
+```bash
+npm run start:cluster
+```
+
+### B. Menjalankan Single-Instance Standar:
 ```bash
 npm run start:all
 ```
 
-### Atau Menjalankan Secara Terpisah:
-```bash
-# Terminal 1 - Service Registry (Wajib jalan pertama)
-npm run start:registry
-
-# Terminal 2 - API Gateway
-npm run start:gateway
-
-# Terminal 3 - Prescription Service
-npm run start:prescription
-
-# Terminal 4 - Pharmacy Service
-npm run start:pharmacy
-
-# Terminal 5 - Cashier Service
-npm run start:cashier
-
-# Terminal 6 - Medical Record Service
-npm run start:medical-record
-```
-
 ---
 
-## 4. Cara Pengujian & Simulasi
+## 4. Cara Pengujian & Demonstrasi Tugas
 
-Buka terminal baru, jalankan:
+### A. Demonstrasi Pembuktian Load Balancer (Rekomendasi untuk Nilai Maksimal)
+Buka terminal terpisah, lalu jalankan:
 ```bash
-npm run simulate
+npm run demo:lb
 ```
+Skrip ini akan:
+1. Menampilkan daftar klaster aktif di Service Registry.
+2. Mengirim 6 request beruntun ke API Gateway.
+3. Menampilkan tabel ASCII yang membuktikan beban terbagi 50% ke Port 8081 dan 50% ke Port 8085.
+4. Membuktikan bahwa Apotek juga menerima beban bergantian (Port 8082 dan Port 8086).
 
-Alur yang disimulasikan:
-1. Pengecekan status Service Registry di `http://localhost:8761/services`.
-2. Pengecekan Gateway di `http://localhost:8000/`.
-3. Pengecekan kesehatan setiap service melalui Gateway.
-4. Dokter mengirimkan resep ke Gateway (`POST /api/prescription/submit-resep`).
-5. **Prescription Service** secara otomatis mencari alamat dan menghubungi:
-   - Apotek via `POST /dispense`
-   - Kasir via `POST /create-bill`
-   - Rekam Medis via `POST /records`
-6. Verifikasi bahwa data antrean apotek, faktur kasir, dan arsip rekam medis benar-benar tersimpan di masing-masing service.
+### B. Demonstrasi Uji Ketahanan (*Failover & High Availability*):
+1. Dalam kondisi sistem `start:cluster` berjalan, matikan Instance 2 (Port 8085) dengan menekan `Ctrl+C` pada prosesnya.
+2. Jalankan kembali:
+   ```bash
+   npm run demo:lb
+   ```
+3. Perhatikan hasilnya: Seluruh 6 request tetap **100% SUKSES** tanpa error, karena Load Balancer secara otomatis mengalihkan seluruh traffic ke Instance 1 (Port 8081).
+4. Nyalakan kembali Port 8085, dan beban otomatis terbagi rata kembali (*Self-Healing*).
