@@ -14,7 +14,12 @@
     "start:all": "concurrently -n \"REGISTRY,GATEWAY,RX,PHARM,CASH,EMR\" -c \"white,cyan,magenta,green,yellow,blue\" \"node registryService.js\" \"node gateway.js\" \"node services/prescriptionService.js\" \"node services/pharmacyService.js\" \"node services/cashierService.js\" \"node services/medicalRecordService.js\"",
     "start:cluster": "concurrently -n \"REGISTRY,GATEWAY,RX-1,RX-2,PHARM-1,PHARM-2,CASH,EMR\" -c \"white,cyan,magenta,magenta,green,green,yellow,blue\" \"node registryService.js\" \"node gateway.js\" \"node services/prescriptionService.js 8081\" \"node services/prescriptionService.js 8085\" \"node services/pharmacyService.js 8082\" \"node services/pharmacyService.js 8086\" \"node services/cashierService.js 8083\" \"node services/medicalRecordService.js 8084\"",
     "simulate": "node simulate.js",
-    "demo:lb": "node demo-loadbalancer.js"
+    "demo:lb": "node demo-loadbalancer.js",
+    "db:migrate": "node database/migrate.js",
+    "db:seed": "node database/seed.js",
+    "db:setup": "node database/migrate.js && node database/seed.js",
+    "db:reset": "node database/reset.js",
+    "simulate:race": "node simulate-race-condition.js"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +27,9 @@
   "dependencies": {
     "concurrently": "^10.0.5",
     "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
     "express": "^5.2.1",
-    "http-proxy-middleware": "^4.2.0"
+    "http-proxy-middleware": "^4.2.0",
+    "mysql2": "^3.24.6"
   }
 }
