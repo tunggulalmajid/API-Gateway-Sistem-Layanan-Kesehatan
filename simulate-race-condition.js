@@ -140,7 +140,9 @@ async function main() {
         console.log(`   ✅ API Gateway aktif di ${GATEWAY}`);
         console.log(`   ✅ Klaster Pharmacy Service terdeteksi: ${totalPharm} instance aktif.`);
         if (totalPharm === 0) {
-            console.warn('   ⚠️ Belum ada instance pharmacy-service yang terdaftar. Jalankan: npm run start:cluster');
+            console.error('   ❌ Belum ada instance pharmacy-service yang terdaftar di Service Registry!');
+            console.error('   👉 Pastikan klaster sudah dijalankan di terminal lain dengan: npm run start:cluster\n');
+            process.exit(1);
         }
     } catch (err) {
         console.error(`❌ Gagal menghubungi API Gateway (${GATEWAY}): ${err.message}`);
